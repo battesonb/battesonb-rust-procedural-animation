@@ -6,26 +6,45 @@ mod joint;
 use std::f32::consts::PI;
 
 use body::Body;
+use constants::BACKGROUND_COLOR;
 use constraints::{AngleConstraint, DistanceConstraint};
 use joint::Joint;
 use macroquad::{camera::set_camera, prelude::*};
+use rand::RandomRange;
 
 #[macroquad::main("Procedural Animation")]
 async fn main() {
-    let total_joints = 10;
+    let total_joints = 25;
     let mut body = Body::new(
+        Color::from_hex(0x61A5B8),
         (0..total_joints)
             .map(|i| {
+                let s1 = 10.0 * (2.0 * PI * (i as f32 / total_joints as f32)).sin();
+                let c1 = 12.0 * (0.2 - 1.2 * PI * (i as f32 / total_joints as f32)).cos();
+                let c2 = 3.0 * (10.0 * PI * (i as f32 / total_joints as f32)).cos();
                 Joint::new(
-                    0.0,
-                    20.0 * i as f32,
-                    30.0 + 10.0 * (2.0 * PI * (i as f32 / total_joints as f32)).sin(),
+                    RandomRange::gen_range(0.0, screen_width()),
+                    RandomRange::gen_range(0.0, screen_height()),
+                    30.0 + s1 + c1 + c2,
                 )
             })
             .collect::<Vec<_>>(),
     )
-    .with_constraint(DistanceConstraint::new(30.0, 1.0))
+    .with_constraint(DistanceConstraint::new(15.0, 1.0))
     .with_constraint(AngleConstraint::new(0.75 * PI, 0.5));
+
+    // eyes
+    let head = body.joints.first_mut().unwrap();
+    head.add_body(
+        Body::new(BLACK, vec![Joint::new(0.0, 0.0, 5.0)])
+            .with_attachment_angle(PI * 0.7)
+            .with_attachment_offset(0.75),
+    );
+    head.add_body(
+        Body::new(BLACK, vec![Joint::new(0.0, 0.0, 5.0)])
+            .with_attachment_angle(-PI * 0.7)
+            .with_attachment_offset(0.75),
+    );
 
     let camera = Camera2D::from_display_rect(Rect::new(
         -screen_width() / 2.0,

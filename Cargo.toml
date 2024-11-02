@@ -5,6 +5,7 @@ edition = "2021"
 license = "MIT"
 
 [dependencies]
+dyn-clone = "1.0.17"
 itertools = "0.13.0"
 lending-iterator = "0.1"
 macroquad = "0.4"

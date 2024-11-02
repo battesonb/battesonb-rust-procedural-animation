@@ -1,11 +1,13 @@
 use macroquad::prelude::*;
 
+use crate::body::Body;
+
 #[derive(Clone, Debug)]
 pub struct Joint {
     pub pos: Vec2,
     pub radius: f32,
     pub angle: f32,
-    // TODO: Each joint should be able to have "sub-bodies" with their own constraints/rules.
+    pub bodies: Vec<Body>,
 }
 
 impl Joint {
@@ -18,6 +20,22 @@ impl Joint {
             pos,
             radius,
             angle: 0.0,
+            bodies: Vec::new(),
         }
+    }
+
+    pub fn draw(&self) {
+        for body in &self.bodies {
+            body.draw();
+        }
+    }
+
+    pub fn with_body(mut self, body: Body) -> Self {
+        self.add_body(body);
+        self
+    }
+
+    pub fn add_body(&mut self, body: Body) {
+        self.bodies.push(body);
     }
 }

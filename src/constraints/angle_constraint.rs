@@ -4,7 +4,7 @@ use lending_iterator::prelude::*;
 use macroquad::math::Vec2;
 
 /// Enforces a minimum angle between 3 consecutive points.
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct AngleConstraint {
     angle: f32,
     rate: f32,

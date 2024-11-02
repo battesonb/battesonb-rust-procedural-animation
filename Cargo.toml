@@ -1,0 +1,10 @@
+[package]
+name = "rust-procedural-animation"
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+
+[dependencies]
+itertools = "0.13.0"
+lending-iterator = "0.1"
+macroquad = "0.4"

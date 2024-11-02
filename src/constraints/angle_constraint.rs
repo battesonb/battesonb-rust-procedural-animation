@@ -1,23 +1,33 @@
 use super::Constraint;
-use crate::joint::Joint;
+use crate::{body::AttachmentPoint, joint::Joint};
 use lending_iterator::prelude::*;
 use macroquad::math::Vec2;
 
 /// Enforces a minimum angle between 3 consecutive points.
 #[derive(Clone, Debug)]
 pub struct AngleConstraint {
-    angle: f32,
-    rate: f32,
+    pub(crate) angle: f32,
+    /// The rate at which to apply the angle constraint.
+    pub(crate) rate: f32,
+}
+
+#[derive(Clone, Debug)]
+pub struct AngleConstraintDescriptor {
+    pub(crate) angle: f32,
+    /// The rate at which to apply the angle constraint.
+    pub(crate) rate: f32,
 }
 
 impl AngleConstraint {
-    pub fn new(angle: f32, rate: f32) -> Self {
+    pub fn new(descriptor: AngleConstraintDescriptor) -> Self {
+        let AngleConstraintDescriptor { angle, rate } = descriptor;
+
         Self { angle, rate }
     }
 }
 
 impl Constraint for AngleConstraint {
-    fn apply(&self, joints: &mut Vec<Joint>) {
+    fn apply(&mut self, joints: &mut Vec<Joint>, _attachment_point: Option<AttachmentPoint>) {
         let mut iter = joints.windows_mut::<3>();
         while let Some([a, b, c]) = iter.next() {
             let ba = a.pos - b.pos;

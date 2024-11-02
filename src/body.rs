@@ -5,39 +5,59 @@ use lending_iterator::prelude::*;
 use macroquad::prelude::*;
 
 use crate::{
-    constants::{DEBUG, DEBUG_LINE_THICKNESS, LINE_COLOR, LINE_THICKNESS},
-    constraints::Constraint,
-    joint::Joint,
+    constants::{DEBUG_COLOR, DEBUG_LINE_THICKNESS},
+    constraints::{Constraint, ConstraintDescriptor},
+    joint::{Joint, JointDescriptor},
 };
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Default)]
+pub enum Side {
+    #[default]
+    Front,
+    Back,
+}
 
 #[derive(Clone, Debug)]
 pub struct Body {
-    pub color: Color,
+    pub line_color: Color,
+    pub line_thickness: f32,
+    pub fill_color: Color,
     pub joints: Vec<Joint>,
     pub constraints: Vec<Box<dyn Constraint>>,
     pub attachment_angle: f32,
     pub attachment_offset: f32,
+    pub side: Side,
+}
+
+#[derive(Copy, Clone, Debug)]
+pub struct AttachmentPoint {
+    pub position: Vec2,
+    pub angle: f32,
 }
 
 impl Body {
-    pub fn new(color: Color, joints: Vec<Joint>) -> Self {
-        Self {
-            color,
+    pub fn new(descriptor: BodyDescriptor) -> Self {
+        let BodyDescriptor {
+            line_color,
+            line_thickness,
+            fill_color,
             joints,
-            constraints: Vec::new(),
-            attachment_angle: 0.0,
-            attachment_offset: 0.0,
+            constraints,
+            attachment_angle,
+            attachment_offset,
+            side,
+        } = descriptor;
+
+        Self {
+            line_color,
+            line_thickness,
+            fill_color,
+            joints: joints.into_iter().map(Into::into).collect::<Vec<_>>(),
+            constraints: constraints.into_iter().map(Into::into).collect::<Vec<_>>(),
+            attachment_angle,
+            attachment_offset,
+            side,
         }
-    }
-
-    pub fn with_attachment_angle(mut self, angle: f32) -> Self {
-        self.attachment_angle = angle;
-        self
-    }
-
-    pub fn with_attachment_offset(mut self, offset: f32) -> Self {
-        self.attachment_offset = offset;
-        self
     }
 
     pub fn with_constraint(mut self, constraint: impl Constraint + 'static) -> Self {
@@ -49,39 +69,46 @@ impl Body {
         self.constraints.push(Box::new(constraint));
     }
 
-    pub fn apply_constraints(&mut self) {
-        for constrait in &self.constraints {
-            constrait.apply(&mut self.joints);
+    pub fn apply_constraints(&mut self, attachment_point: Option<AttachmentPoint>) {
+        for constrait in &mut self.constraints {
+            constrait.apply(&mut self.joints, attachment_point);
         }
 
         // update joint angles
         let mut iter = self.joints.windows_mut::<2>();
         while let Some([a, b]) = iter.next() {
-            b.angle = (b.pos - a.pos).normalize().to_angle();
+            b.angle = (b.pos - a.pos).normalize_or(Vec2::X).to_angle();
         }
 
         // Make the first angle the same as the second, since it's skipped above
-        let mut iter = self.joints.iter_mut();
-        let Some(first) = iter.next() else {
-            return;
-        };
-        let Some(second) = iter.next() else {
-            return;
-        };
+        'angle: {
+            let mut iter = self.joints.iter_mut();
+            let Some(first) = iter.next() else {
+                break 'angle;
+            };
+            let Some(second) = iter.next() else {
+                break 'angle;
+            };
 
-        first.angle = second.angle;
+            first.angle = second.angle;
+        }
 
         // Apply constraints to inner bodies, first of which is that the first joint of a body is
         // always fixed to the body's parent joint.
+        let angle = attachment_point.map_or(0., |ap| ap.angle);
         for joint in &mut self.joints {
             for body in &mut joint.bodies {
-                if let Some(first_joint) = body.joints.first_mut() {
-                    first_joint.pos = joint.pos
+                let attachment_point = AttachmentPoint {
+                    position: joint.pos
                         + body.attachment_offset
                             * joint.radius
-                            * Vec2::from_angle(joint.angle + body.attachment_angle);
+                            * Vec2::from_angle(joint.angle + body.attachment_angle + angle),
+                    angle: self.attachment_angle + joint.angle + angle,
+                };
+                if let Some(first_joint) = body.joints.first_mut() {
+                    first_joint.pos = attachment_point.position;
                 }
-                body.apply_constraints();
+                body.apply_constraints(Some(attachment_point));
             }
         }
     }
@@ -136,7 +163,7 @@ impl Body {
     {
         let vertices = points
             .into_iter()
-            .map(|point| Vertex::new2(point.extend(0.0), Vec2::ZERO, self.color))
+            .map(|point| Vertex::new2(point.extend(0.0), Vec2::ZERO, self.fill_color))
             .collect::<Vec<_>>();
         let index_count = (vertices.len() - 2).max(0) / 2;
         let indices = (0..index_count)
@@ -153,29 +180,88 @@ impl Body {
         }
     }
 
-    pub fn draw(&self) {
-        let points = self.points();
-
-        for (a, b) in points.iter().step_by(2).tuple_windows() {
-            draw_line(a.x, a.y, b.x, b.y, LINE_THICKNESS, LINE_COLOR);
+    pub fn draw(&self, debug: bool) {
+        for joint in &self.joints {
+            joint.draw(Side::Back, debug);
         }
 
-        for (a, b) in points.iter().skip(1).step_by(2).tuple_windows() {
-            draw_line(a.x, a.y, b.x, b.y, LINE_THICKNESS, LINE_COLOR);
+        let points = self.points();
+
+        if self.line_thickness > 0. {
+            for (a, b) in points
+                .iter()
+                .step_by(2)
+                .tuple_windows()
+                .chain(points.iter().skip(1).step_by(2).tuple_windows())
+            {
+                draw_circle(a.x, a.y, self.line_thickness / 2., self.line_color);
+                draw_line(a.x, a.y, b.x, b.y, self.line_thickness, self.line_color);
+                draw_circle(b.x, b.y, self.line_thickness / 2., self.line_color);
+            }
         }
 
         let mesh = self.mesh(&points);
         draw_mesh(&mesh);
 
         for joint in &self.joints {
-            joint.draw();
+            joint.draw(Side::Front, debug);
         }
 
-        if DEBUG {
+        if debug {
             for circle in &self.joints {
                 let pos = circle.pos;
-                draw_circle_lines(pos.x, pos.y, circle.radius, DEBUG_LINE_THICKNESS, BLUE);
+                draw_circle_lines(
+                    pos.x,
+                    pos.y,
+                    circle.radius,
+                    DEBUG_LINE_THICKNESS,
+                    DEBUG_COLOR,
+                );
             }
         }
+    }
+}
+
+#[derive(Clone, Debug)]
+pub struct BodyDescriptor {
+    pub line_color: Color,
+    pub line_thickness: f32,
+    pub fill_color: Color,
+    pub joints: Vec<JointDescriptor>,
+    pub constraints: Vec<ConstraintDescriptor>,
+    pub attachment_angle: f32,
+    pub attachment_offset: f32,
+    pub side: Side,
+}
+
+impl Default for BodyDescriptor {
+    fn default() -> Self {
+        Self {
+            line_color: BLACK,
+            line_thickness: 6.0,
+            fill_color: WHITE,
+            joints: Vec::new(),
+            constraints: Vec::new(),
+            attachment_angle: 0.0,
+            attachment_offset: 0.0,
+            side: Side::Front,
+        }
+    }
+}
+
+impl BodyDescriptor {
+    pub fn with_constraint(mut self, constraint: ConstraintDescriptor) -> Self {
+        self.add_constraint(constraint);
+        self
+    }
+
+    pub fn add_constraint(&mut self, constraint: ConstraintDescriptor) {
+        self.constraints.push(constraint);
+    }
+}
+
+impl From<BodyDescriptor> for Body {
+    fn from(descriptor: BodyDescriptor) -> Self {
+        Self::new(descriptor)
     }
 }

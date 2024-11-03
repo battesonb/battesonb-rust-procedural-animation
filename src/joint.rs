@@ -1,6 +1,9 @@
 use macroquad::prelude::*;
 
-use crate::body::{Body, BodyDescriptor, Side};
+use crate::{
+    body::{Body, BodyDescriptor, Side},
+    constants::{DEBUG_COLOR, DEBUG_LINE_THICKNESS},
+};
 
 #[derive(Clone, Debug)]
 pub struct Joint {
@@ -48,11 +51,25 @@ impl Joint {
         }
     }
 
-    pub fn draw(&self, side: Side, debug: bool) {
+    pub fn draw(&self, side: Side) {
         for body in &self.bodies {
             if body.side == side {
-                body.draw(debug);
+                body.draw();
             }
+        }
+    }
+
+    pub fn debug_draw(&self) {
+        draw_circle_lines(
+            self.pos.x,
+            self.pos.y,
+            self.radius,
+            DEBUG_LINE_THICKNESS,
+            DEBUG_COLOR,
+        );
+
+        for body in &self.bodies {
+            body.debug_draw();
         }
     }
 

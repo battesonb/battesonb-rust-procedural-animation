@@ -11,6 +11,7 @@ use super::{
 
 pub trait Constraint: Debug + DynClone {
     fn apply(&mut self, joints: &mut Vec<Joint>, attachment_point: Option<AttachmentPoint>);
+    fn debug_draw(&self) {}
 }
 
 dyn_clone::clone_trait_object!(Constraint);

@@ -2,10 +2,9 @@ use std::f32::consts::PI;
 
 use itertools::Itertools;
 use lending_iterator::prelude::*;
-use macroquad::prelude::*;
+use macroquad::{prelude::*, rand};
 
 use crate::{
-    constants::{DEBUG_COLOR, DEBUG_LINE_THICKNESS},
     constraints::{Constraint, ConstraintDescriptor},
     joint::{Joint, JointDescriptor},
 };
@@ -48,7 +47,7 @@ impl Body {
             side,
         } = descriptor;
 
-        Self {
+        let mut init = Self {
             line_color,
             line_thickness,
             fill_color,
@@ -57,7 +56,11 @@ impl Body {
             attachment_angle,
             attachment_offset,
             side,
-        }
+        };
+
+        jitter(&mut init);
+
+        init
     }
 
     pub fn with_constraint(mut self, constraint: impl Constraint + 'static) -> Self {
@@ -180,9 +183,9 @@ impl Body {
         }
     }
 
-    pub fn draw(&self, debug: bool) {
+    pub fn draw(&self) {
         for joint in &self.joints {
-            joint.draw(Side::Back, debug);
+            joint.draw(Side::Back);
         }
 
         let points = self.points();
@@ -204,20 +207,17 @@ impl Body {
         draw_mesh(&mesh);
 
         for joint in &self.joints {
-            joint.draw(Side::Front, debug);
+            joint.draw(Side::Front);
+        }
+    }
+
+    pub fn debug_draw(&self) {
+        for joint in &self.joints {
+            joint.debug_draw();
         }
 
-        if debug {
-            for circle in &self.joints {
-                let pos = circle.pos;
-                draw_circle_lines(
-                    pos.x,
-                    pos.y,
-                    circle.radius,
-                    DEBUG_LINE_THICKNESS,
-                    DEBUG_COLOR,
-                );
-            }
+        for constraint in &self.constraints {
+            constraint.debug_draw();
         }
     }
 }
@@ -263,5 +263,18 @@ impl BodyDescriptor {
 impl From<BodyDescriptor> for Body {
     fn from(descriptor: BodyDescriptor) -> Self {
         Self::new(descriptor)
+    }
+}
+
+// Randomize each joint to ensure that the body is always rendered correctly.
+fn jitter(body: &mut Body) {
+    for joint in &mut body.joints {
+        joint.pos += Vec2::new(
+            rand::RandomRange::gen_range(-0.05, 0.05),
+            rand::RandomRange::gen_range(-0.05, 0.05),
+        );
+        for body in &mut joint.bodies {
+            jitter(body);
+        }
     }
 }

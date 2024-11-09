@@ -204,8 +204,11 @@ async fn main() {
             if use_mouse {
                 first.pos = first.pos.lerp(mouse_world, 0.1);
             } else {
-                let x = get_time().cos() as f32;
-                let y = (get_time() * 2.).sin() as f32;
+                let t = get_time() as f32;
+                let a = 1.5;
+                let denominator = 1. + t.sin() * t.sin();
+                let x = a * t.cos() / denominator;
+                let y = 2. * a * t.sin() * t.cos() / denominator;
                 first.pos = first.pos.lerp(
                     (Vec2::new(x, y)
                         * (camera.screen_to_world(Vec2::new(screen_width(), screen_height()))))

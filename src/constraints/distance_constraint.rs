@@ -55,19 +55,10 @@ impl DistanceConstraint {
         }
     }
 
-    #[inline]
-    pub fn distance_squared(&self) -> f32 {
-        self.distance * self.distance
-    }
-
     fn apply_to_pair(&self, joint: &mut Joint, source: Vec2) {
         let delta = joint.pos - source;
-        let distance_squared = delta.length_squared();
-        if distance_squared <= self.distance_squared() {
-            return;
-        }
 
-        let distance = distance_squared.sqrt();
+        let distance = delta.length();
         let target = source + self.distance * delta / distance;
 
         joint.pos = joint.pos.lerp(target, self.rate);
